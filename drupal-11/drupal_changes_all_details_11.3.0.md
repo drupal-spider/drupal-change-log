@@ -1,5 +1,443 @@
 # Drupal Change Records for 11.3.0
 
+## [node_add_body_field() is deprecated](https://www.drupal.org/node/3516778)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+The `node_add_body_field` method was only used in test code by Drupal core.
+
+
+The function is now deprecated, there is no direct replacement.
+
+
+If you need to create content types in tests with a body field, use `ContentTypeCreationTrait::createContentType` which will automatically add a body field.
+
+
+If you need to add body fields for other entity types, there is also a new `BodyFieldCreationTrait` to add the same type of field to any bundle.
+
+
+Otherwise you can create the field config directly:
+
+
+
+```php
+$field_storage = FieldStorageConfig::loadByName('node', 'body');
+  $field = FieldConfig::loadByName('node', $bundle, 'body');
+  if (!$field) {
+    $field = FieldConfig::create([
+      'field_storage' => $field_storage,
+      'bundle' => $bundle,
+      'label' => $label,
+      'settings' => [
+        'display_summary' => TRUE,
+        'allowed_formats' => [],
+      ],
+    ]);
+    $field->save();
+  }
+```
+
+---
+
+## [Promoted to front page now defaults to FALSE for new content types](https://www.drupal.org/node/3517642)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Site builders, administrators, editors
+
+### Description
+
+Prior to [#987238: "Promoted to front page" for new content types should default to Un-Checked](https://www.drupal.org/project/drupal/issues/987238) when creating a new content type, the default value for the "Promoted to front page" field on a Node was TRUE. This field is configurable per Node Type under the Publishing Options when editing the Node Type. 
+
+
+Changing the setting on a Node Type creates or updates a base field override configuration entity for that node type's promote field to override the default.
+
+
+Existing Node Types that were created prior to 11.3.0, and were using the default value of TRUE, will have base field override configuration created to maintain the previous default setting.
+
+
+New content types created after 11.3.0 will default to FALSE.
+
+---
+
+## [`content:export` command added to help with recipe development](https://www.drupal.org/node/3533854)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+Recipes have been able to include default content since they were first introduced to core. However, creating that default content has not been supported by core; it was necessary to use the contributed [Default Content](https://www.drupal.org/project/default_content) module to export content from Drupal into the format used by recipes.
+
+
+As of [#3532694: Add a command-line utility to export content in YAML format](https://www.drupal.org/project/drupal/issues/3532694), Drupal core now includes a command-line tool to export content in that format. It can export a single entity at a time -- dependencies of the entity (for example, images attached to it or taxonomy terms it references) are calculated, but not exported automatically.
+
+
+How to use
+To use it, run the following from the Drupal root:
+
+
+
+```php
+php core/scripts/drupal content:export <ENTITY_TYPE_ID> <ENTITY_ID>
+```
+
+For example: `php core/scripts/drupal content:export taxonomy_term 40`
+
+
+This will output a dump of the entity's data in YAML format. You can save it to a file like this: `php core/scripts/drupal content:export taxonomy_term 40 > recipes/my_recipe/content/taxonomy_term/some-tag.yml`
+
+
+How to integrate with the API
+The export command supports core field types, but modules that provide their own field types may need to write a little code to integrate with this command.
+
+
+You can attach a callback to a particular field type (or a particular field) by writing an event subscriber that listens to `\Drupal\Core\DefaultContent\PreExportEvent`, which is dispatched before an entity is exported. The subscriber should call the event's `setCallback()` method, which takes either a field name or a field type (such as `field_item:image` -- if using a field type, the `field_item:` prefix must be present), and a callback that takes two arguments: the field item being exported (`\Drupal\Core\FieldItemInterface`) and an object that collects information about the entity being exported (`\Drupal\Core\DefaultContent\ExportMetadata`). It should return the exported values for that field item, or NULL if the item shouldn't be exported.
+
+
+For examples, see the following classes:
+
+
+
+- `\Drupal\Core\DefaultContent\Exporter`
+
+- `\Drupal\link\EventSubscriber\DefaultContentSubscriber`
+
+
+The event can also be used to opt a specific field out of being exported:
+
+
+
+```php
+$event->setExportable('field_name', FALSE);
+```
+
+Computed fields are not exported by default, but you can use that same method to opt them in:
+
+
+
+```php
+$event->setExportable('some_computed_field', TRUE);
+```
+How to use the API
+You can export an entity programmatically using the new `Exporter` service:
+
+
+
+```php
+use Drupal\Core\DefaultContent\Exporter;
+
+$node = Node::load(32);
+$exported_data_as_array = \Drupal::service(Exporter::class)->export($node);
+```
+
+---
+
+## [CKEditor 5 now offers a UI for setting list type](https://www.drupal.org/node/3529709)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Site builders, administrators, editors
+
+### Description
+
+CKEditor 5 32.0.0 added a UI for setting a list type and now Drupal uses it:
+
+
+
+
+
+Sites with text formats that currently allow the `type` attribute on `ul` or `ol` elements through either unrestricted formats (such as "Full HTML") or manually editable HTML tags will automatically allow the user to choose a list style type.
+
+
+Sites without text formats currently allowing the `type` attribute can enable it manually using the "Allow the user to choose a list style type" option from the List CKEditor 5 plugin settings:
+
+---
+
+## [ViewsConfigUpdater is now a service](https://www.drupal.org/node/3530638)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+`Drupal\views\ViewsConfigUpdater` is now a service to properly persist the `$deprecationsEnabled` property.
+
+
+Before:
+`\Drupal::classResolver('Drupal\views\ViewsConfigUpdater');`
+
+
+After:
+`\Drupal::service('Drupal\views\ViewsConfigUpdater');`
+
+---
+
+## [Passing NULL as the $elements value in RendererInterface::render() is deprecated](https://www.drupal.org/node/3534020)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+Passing `NULL` as the value for the `$elements ` parameter in `RendererInterface::render()` is deprecated in Drupal 11.2.3 and will not be supported in Drupal 12.0.0.
+
+
+Type declarations will be added to the $element parameter in the method signature in Drupal 12.0.0, so that it will look like this:
+`public function render(array &$elements)`
+
+
+Note that the `$is_root_call` parameter was previously deprecated in 11.2.0 and will be removed in Drupal 12.0.0.
+
+---
+
+## [Recipe input now accepts environment variables](https://www.drupal.org/node/3524496)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Site builders, administrators, editors
+
+### Description
+
+In addition to `config` and `value`, recipe's input source element now accepts `env`.  If `source` is `env`, there must also be an `env` element, which is the name of an environment variable to return. 
+
+
+The value will always be returned as a string. If the environment variable is not set, an empty string will be returned.
+
+
+Example:
+
+
+
+```php
+name: 'Input from environment variables'
+input:
+  name:
+    data_type: string
+    description: The name of the site.
+    default:
+      # Set the source to look for an environment variable.
+      source: env
+      # Define the name of the environment variable.
+      env: SITE_NAME
+  slogan:
+    data_type: string
+    description: The site slogan.
+    default:
+      source: env
+      env: SITE_SLOGAN
+config:
+  actions:
+    system.site:
+      # Use the input in the same way we always have.
+      simpleConfigUpdate:
+        name: ${name}
+        slogan: ${slogan}
+```
+
+---
+
+## [Update details element templates to add description ID attributes](https://www.drupal.org/node/3509534)
+
+- **Version**: 11.3.0
+- **Branch**: 11.3.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Themers
+
+### Description
+
+Details form elements with descriptions were given an invalid `aria-describedby` attribute whose target did not correspond to any HTML element.  All core templates have been updated to add the `id` to a wrapper around the description.  If you have overridden the details.html.twig template, then you should update your template in order to have valid markup and improve accessibility.
+
+
+Basic Example
+Before:
+
+
+
+```php
+{{ description }}
+```
+
+After:
+
+
+
+```php
+{%- if description -%}
+    {% set description_attributes = create_attribute({id: attributes['aria-describedby']}) %}
+    <div{{ description_attributes }}>{{ description }}</div>
+  {%- endif -%}
+```
+Example description with pre-existing wrapper
+Before:
+
+
+
+```php
+{%- if description -%}
+      <div class="details-description">{{ description }}</div>
+    {%- endif -%}
+```
+
+After:
+
+
+
+```php
+{%- if description -%}
+      {% set description_attributes = create_attribute({id: attributes['aria-describedby']}) %}
+      <div{{ description_attributes.addClass(['details-description']) }}>{{ description }}</div>
+    {%- endif -%}
+```
+
+---
+
+## [node_type_get_description is deprecated](https://www.drupal.org/node/3531945)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+`node_type_get_description($node_type)` is deprecated, use `$node_type->getDescription()` instead
+
+---
+
+## [HtaccessWriter requires a Settings constructor argument](https://www.drupal.org/node/3249817)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+HtaccessWriter now requires a Settings constructor argument.
+
+
+Before
+
+
+
+```php
+file.htaccess_writer:
+    class: Drupal\Core\File\HtaccessWriter
+    arguments: ['@logger.channel.security', '@stream_wrapper_manager']
+```
+
+After
+
+
+
+```php
+file.htaccess_writer:
+    class: Drupal\Core\File\HtaccessWriter
+    arguments: ['@logger.channel.security', '@stream_wrapper_manager', '@settings']
+```
+
+---
+
+## [Automatic creation of .htaccess files can be disabled](https://www.drupal.org/node/3525119)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Site builders, administrators, editors
+
+### Description
+
+Sites not using the Apache HTTP server or that use a web server configuration that protects writable file directories can disable the creation of the `.htaccess`.
+
+
+To disable file creation `auto_create_htaccess` must be set to `FALSE` in the site `settings.php` file.
+
+
+Example
+`$settings['auto_create_htaccess'] = FALSE`
+
+
+If disabled, make sure to follow the guide for [ensuring directories are secure and prevent scripts from being executed](https://www.drupal.org/docs/administering-a-drupal-site/security-in-drupal/securing-file-permissions-and-ownership).
+
+---
+
+## [\Drupal\Core\Utility\Error::currentErrorHandler is deprecated](https://www.drupal.org/node/3529500)
+
+- **Version**: 11.3.0
+- **Branch**: 11.3.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+`\Drupal\Core\Utility\Error::currentErrorHandler is deprecated`, use [`get_error_handler()` ](https://www.php.net/manual/en/function.get-error-handler.php)instead.
+
+
+The `get_error_handler` function is added in PHP 8.5. Until Drupal requires PHP 8.5 a polyfill is provided via [`symfony/polyfill-php85`](https://github.com/symfony/polyfill-php85).
+
+---
+
+## [New BlockContentCreationTrait for tests interacting with block content entities](https://www.drupal.org/node/3532512)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+A new trait `Drupal\Tests\block_content\Traits\BlockContentCreationTrait` has been added with the following methods: `createBlockContent` and `createBlockContentType`
+
+
+These methods previously existed on the base class `\Drupal\Tests\block_content\Functional\BlockCotentTestBase`
+
+
+Tests that create block content types and/or entities can now reuse these functions to reduce duplication.
+
+---
+
+## [status and info settings in block_content blocks are deprecated](https://www.drupal.org/node/3499836)
+
+- **Version**: 11.3.0
+- **Branch**: 11.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Site builders, administrators, editors
+
+### Description
+
+The 'status' and 'info settings for block_content blocks are deprecated. They were unused, so there is no replacement
+
+---
+
 ## [node_title_list is deprecated](https://www.drupal.org/node/3531959)
 
 - **Version**: 11.3.0
@@ -89,6 +527,20 @@ public function singleElementObject(FieldItemListInterface $items, $delta, Widge
 ```
 
 Note this does not call `parent::singleElementObject()` and that's correct. `WidgetBase::singleElementObject` provides backwards compatibility by calling `$this->formElement()` and wrapping it for the modern OOP elements API, there's no need to call it once the conversion above has been done.
+
+---
+
+## [Calling RenderElementBase ::__construct without ElementInfoManagerInterface is now deprecated](https://www.drupal.org/node/3526683)
+
+- **Version**: 11.3.0
+- **Branch**: 11.3.x
+- **Status**: Published (View all published change records)
+- **Project**: Drupal core
+- **Impacts**: Module developers
+
+### Description
+
+The fourth argument to __construct for RenderElementBase must now be ElementInfoManagerInterface
 
 ---
 
@@ -221,6 +673,8 @@ Libraries moved in 11.3.0:
 
 
 - [#3512285: Split item-list.module.css out to its own library](https://www.drupal.org/project/drupal/issues/3512285)
+
+- [#3512404: Move reset-appearance.module.css to its own library](https://www.drupal.org/project/drupal/issues/3512404)
 
 ---
 
@@ -529,6 +983,39 @@ services:
 ```
 Preliminary Mail Building API
 Not designed/implemented yet.
+
+
+Preliminary Mail Capturing while Testing
+Mails sent through the `Symfony\Component\Mailer\MailerInterface` and `Symfony\Component\Mailer\Transport\TransportInterface` services are discarded during tests. Enable the `mailer_capture` module in order to capture them form within a test case.
+
+
+Mails captured by the `mailer_capture` module can be retrieved using the `getMails()` method from the `Drupal\Core\Test\MailerCaptureTrait` trait.
+
+
+Example: Capture emails during test
+
+```php
+class MailFormTest extends BrowserTestBase {
+
+  use MailerCaptureTrait;
+
+  protected static $modules = ['mailer', 'mailer_capture'];
+
+  public function testMailForm(): void {
+    // Before we send the email, getEmails should return an empty array.
+    $capturedEmails = $this->getEmails();
+    $this->assertCount(0, $capturedEmails, 'The captured emails queue is empty.');
+
+    $this->drupalGet('/mailer-capture-test/send-mail');
+    $this->submitForm([], 'Send Mail');
+
+    // Ensure that there is one email in the captured emails array.
+    $capturedEmails = $this->getEmails();
+
+    $this->assertCount(1, $capturedEmails, 'One email was captured.');
+  }
+}
+```
 
 ---
 
